@@ -412,38 +412,64 @@ void PhotonIntegrator::Preprocess(const Scene *scene,
     delete directMap;
 }
 
-void PhotonShootingTask::ShootVolumetricPhotons() {
-
-    printf("HEY! We're About to Shoot Some Fucking VOLUMETRIC photons!!!!!!!\n");
+void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhotons) {
+    //printf("HEY! We're About to Shoot Some Fucking VOLUMETRIC photons!!!!!!!\n");
 
     Point lightPosition = Point(0.0, 10.0, 2.0);
 
-    //VolumeRegion *testRegion = getRenderOptions()->volumeRegions->back();
-    RenderOptions *renderOptions = getRenderOptions();
-    VolumeRegion *testRegion = renderOptions->volumeRegions.back();
-    printf("Size of Volume Region: %d\n", renderOptions->volumeRegions.size());
+    VolumeRegion *testRegion = getRenderOptions()->volumeRegions.back();
     BBox bound = testRegion->WorldBound();
-    //printf("%f\n", bound.pMin.x);
-    printf("%f, %f, %f\n",testRegion->WorldBound().pMin.x, testRegion->WorldBound().pMin.y, testRegion->WorldBound().pMin.z);
-    printf("%f, %f, %f\n",testRegion->WorldBound().pMax.x, testRegion->WorldBound().pMax.y, testRegion->WorldBound().pMax.z);
+    printf("\n\n Min(%f, %f, %f), Max(%f, %f, %f)\n",testRegion->WorldBound().pMin.x, testRegion->WorldBound().pMin.y, testRegion->WorldBound().pMin.z, 
+                                               testRegion->WorldBound().pMax.x, testRegion->WorldBound().pMax.y, testRegion->WorldBound().pMax.z);
 
-    Point randomSamplePointInBox;
+    int numOfPhotonsPerCore = 100;
+    int maxDepthTracePerPhoton = 5;
+    for (int i = 0; i < numOfPhotonsPerCore; i++){
+        Point randomSamplePointInBox;
 
-    int xRandomVal = ((float)rand()/(float)RAND_MAX) * (testRegion->WorldBound().pMin.x-testRegion->WorldBound().pMax.x);
-    int yRandomVal = ((float)rand()/(float)RAND_MAX) * (testRegion->WorldBound().pMin.y-testRegion->WorldBound().pMax.y);
-    int zRandomVal = ((float)rand()/(float)RAND_MAX) * (testRegion->WorldBound().pMin.z-testRegion->WorldBound().pMax.z);
+        float xRandomVal = ((float)rand()/(float)RAND_MAX) * (testRegion->WorldBound().pMax.x-testRegion->WorldBound().pMin.x);
+        float yRandomVal = ((float)rand()/(float)RAND_MAX) * (testRegion->WorldBound().pMax.y-testRegion->WorldBound().pMin.y);
+        float zRandomVal = ((float)rand()/(float)RAND_MAX) * (testRegion->WorldBound().pMax.z-testRegion->WorldBound().pMin.z);
+        randomSamplePointInBox = Point(testRegion->WorldBound().pMin.x+xRandomVal, testRegion->WorldBound().pMin.y+yRandomVal, testRegion->WorldBound().pMin.z+zRandomVal);
+        printf("Here is the random point %f %f %f \n", randomSamplePointInBox.x, randomSamplePointInBox.y, randomSamplePointInBox.z);
 
-    randomSamplePointInBox = Point(testRegion->WorldBound().pMin.x+xRandomVal, testRegion->WorldBound().pMin.y+yRandomVal, testRegion->WorldBound().pMin.z+zRandomVal);
+        Ray r = Ray(lightPosition, Vector(randomSamplePointInBox-lightPosition), 0.0f);
+
+        float hitt0 = NULL;
+        float hitt1 = NULL;
+        if (bound.IntersectP(r, &hitt0, &hitt1)){
+            printf("Good, we hit. That's to be expected since we picked a point inside the box \n");
+        }
+
+        float tToUse = hitt0;
+        if (!tToUse)
+            tToUse = hitt1;
+
+        Point pointPhotonHit = r(tToUse);
+        Spectrum alpha = 1.0;//(AbsDot(Nl, photonRay.d) * Le) / (pdf * lightPdf);
+        Vector wo = -r.d;
+        Photon photon(pointPhotonHit, alpha, wo);
+        localVolumePhotons.push_back(photon);
+
+        r = Ray(pointPhotonHit, r.d, 0.0f);
+        float averageDistanceUntilEvent = 1.0;
+        float probOfAbsorbing = .5;
+        for (int j = 0; j < maxDepthTracePerPhoton; j++){
+            r = Ray(r(averageDistanceUntilEvent), r.d, 0.0f);
+
+            float randomlyChoosenNormalizedNumber = (float)rand()/(float)RAND_MAX;
+            if (randomlyChoosenNormalizedNumber > probOfAbsorbing){ //Absorb The Photon!
+                Spectrum alpha = 1.0;//(AbsDot(Nl, photonRay.d) * Le) / (pdf * lightPdf);
+                Vector wo = -r.d;
+                Photon photon(r.o, alpha, wo);
+                localVolumePhotons.push_back(photon);
+            }
+            else { //Split The Photon
+                //Recursively Handle Photon Splitting Here - Maybe we need to put all our current photons in an array?
+            }
+        }
 
 
-
-    Ray r = Ray(lightPosition, Vector(randomSamplePointInBox-lightPosition), 0.0f);
-
-
-    float hitt0 = NULL;
-    float hitt1 = NULL;
-    if (bound.IntersectP(r, &hitt0, &hitt1)){
-        printf("Good, we hit. That's to be expected since we picked a point inside the box \n");
     }
 }
 
@@ -463,7 +489,9 @@ void PhotonShootingTask::Run() {
     PermutedHalton halton(6, rng);
     vector<Spectrum> localRpReflectances, localRpTransmittances;
 
-    ShootVolumetricPhotons();
+    ShootVolumetricPhotons(localVolumePhotons);
+    for (uint32_t i = 0; i < localVolumePhotons.size(); ++i)
+        volumePhotons.push_back(localVolumePhotons[i]);
 
 
     while (true) {

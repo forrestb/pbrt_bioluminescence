@@ -944,7 +944,6 @@ void pbrtVolume(const string &name, const ParamSet &params) {
     VERIFY_WORLD("Volume");
     WARN_IF_ANIMATED_TRANSFORM("Volume");
     VolumeRegion *vr = MakeVolumeRegion(name, curTransform[0], params);
-    printf("Pushing Back A Volume Region!\n");
     if (vr) renderOptions->volumeRegions.push_back(vr);
 }
 

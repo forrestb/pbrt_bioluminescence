@@ -66,7 +66,7 @@ private:
     // PhotonIntegrator Private Methods
     friend class PhotonShootingTask;
 
-    void ShootVolumetricPhotons();
+    void ShootVolumetricPhotons(vector<Photon> &localVolumePhotons);
 
     // PhotonIntegrator Private Data
     uint32_t nCausticPhotonsWanted, nIndirectPhotonsWanted, nVolumePhotonsWanted, nLookup;
