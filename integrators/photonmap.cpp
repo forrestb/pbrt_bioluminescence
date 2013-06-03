@@ -46,12 +46,13 @@
 
 // PhotonIntegrator Local Declarations
 struct Photon {
-    Photon(const Point &pp, const Spectrum &wt, const Vector &w)
-        : p(pp), alpha(wt), wi(w) { }
+    Photon(const Point &pp, const Spectrum &wt, const Vector &w, float startingWeight = 1.0)
+        : p(pp), alpha(wt), wi(w), weight(startingWeight) { }
     Photon() { }
     Point p;
     Spectrum alpha;
     Vector wi;
+    float weight;
 };
 
 
@@ -502,12 +503,12 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
                 alpha.ToRGB(rgb_alpha);
                 rgb_alpha[0] *= powf(e, rgb_T[0] * currDistThroughMedium);
                 rgb_alpha[1] *= powf(e, rgb_T[1] * currDistThroughMedium);
-                rgb_alpha[1] *= powf(e, rgb_T[1] * currDistThroughMedium);
+                rgb_alpha[2] *= powf(e, rgb_T[2] * currDistThroughMedium);
                 photon.alpha = Spectrum::FromRGB(rgb_alpha);
 
-              //  Photon photon(r.o, alpha, wo); we already have a photon//
+                //  Photon photon(r.o, alpha, wo); we already have a photon//
                 localVolumePhotons.push_back(photon);
-                continue; //This photon is done with so we can stop the loop
+                break; //This photon is done with so we can stop the loop
             }
             else { //Split The Photon
                 //Recursively Handle Photon Splitting Here - Maybe we need to put all our current photons in an array?
@@ -556,9 +557,10 @@ void PhotonShootingTask::Run() {
     vector<Spectrum> localRpReflectances, localRpTransmittances;
 
     ShootVolumetricPhotons(localVolumePhotons);
-  //  std::cout<<"NUMBER OF VOLUME PHOTONS: "<< localVolumePhotons.size()<<" YAY!"<<std::endl;
-    for (uint32_t i = 0; i < localVolumePhotons.size(); ++i)
-        volumePhotons.push_back(localVolumePhotons[i]);
+    //printf("Done Shooting\n");
+    //  std::cout<<"NUMBER OF VOLUME PHOTONS: "<< localVolumePhotons.size()<<" YAY!"<<std::endl;
+    /*for (uint32_t i = 0; i < localVolumePhotons.size(); ++i)
+        volumePhotons.push_back(localVolumePhotons[i]);*/
 
 
     while (true) {
