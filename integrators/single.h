@@ -45,13 +45,17 @@ class SingleScatteringIntegrator : public VolumeIntegrator {
 public:
     // SingleScatteringIntegrator Public Methods
     SingleScatteringIntegrator(float ss) { stepSize = ss; }
+    
     Spectrum Transmittance(const Scene *, const Renderer *,
         const RayDifferential &ray, const Sample *sample, RNG &rng,
         MemoryArena &arena) const;
+    
     void RequestSamples(Sampler *sampler, Sample *sample,
         const Scene *scene);
+    
     Spectrum Li(const Scene *, const Renderer *, const RayDifferential &ray,
          const Sample *sample, RNG &rng, Spectrum *T, MemoryArena &arena) const;
+    
 private:
     // SingleScatteringIntegrator Private Data
     float stepSize;

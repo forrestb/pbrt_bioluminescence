@@ -182,6 +182,8 @@ static Spectrum LPhoton(KdTree<Photon> *map, int nPaths, int nLookup,
     const Vector &w, float maxDistSquared);
 static Spectrum EPhoton(KdTree<Photon> *map, int count, int nLookup,
     ClosePhoton *lookupBuf, float maxDist2, const Point &p, const Normal &n);
+static Spectrum EVolumePhoton(KdTree<Photon> *map, int count, int nLookup,
+                              ClosePhoton *lookupBuf, float dist, const Point &p);
 
 // PhotonIntegrator Local Definitions
 inline bool unsuccessful(uint32_t needed, uint32_t found, uint32_t shot) {
@@ -262,6 +264,27 @@ Spectrum LPhoton(KdTree<Photon> *map, int nPaths, int nLookup,
             proc.nFound, proc.nLookup, &L);
     }
     return L;
+}
+
+Spectrum EVolumePhoton(KdTree<Photon> *map, int count, int nLookup,
+                       ClosePhoton *lookupBuf, float dist, const Point &p)
+{
+    if(!map) return 0.f;
+    
+    PhotonProcess proc(nLookup, lookupBuf);
+    float md3 = dist * dist * dist;
+    
+    map->Lookup(p, proc, md3);
+    Assert(md3 > 0.f);
+    
+    
+    if(proc.nFound == 0) return Spectrum(0.f);
+    ClosePhoton *photons = proc.photons;
+    Spectrum E(0.);
+    for(int i =0; i < proc.nFound; i++)
+        E += photons[i].photon->alpha * photons[i].photon->weight;
+    
+    return E / ((4.0f/3.0f)* M_PI * md3);
 }
 
 
@@ -426,7 +449,7 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
     BBox bound = testRegion->WorldBound();
     
     //Set shooting options
-    int numOfPhotonsPerCore = 100000;
+    int numOfPhotonsPerCore = 100;
     int maxDepthTracePerPhoton = 5;
     
     //Loop over all of the photons we want to shoot out.
@@ -545,9 +568,12 @@ void PhotonShootingTask::Run() {
     ShootVolumetricPhotons(localVolumePhotons);
     //printf("Done Shooting\n");
     std::cout<<"NUMBER OF VOLUME PHOTONS: "<< localVolumePhotons.size()<<" YAY!"<<std::endl;
-    for (uint32_t i = 0; i < localVolumePhotons.size(); ++i)
-        volumePhotons.push_back(localVolumePhotons[i]);
-
+//    
+//    MutexLock lock(mutex);
+//    for (uint32_t i = 0; i < localVolumePhotons.size(); ++i){
+//        volumePhotons.push_back(localVolumePhotons[i]);
+//    }
+//    MutexLock unlock(mutex);
 
     while (true) {
         // Follow photon paths for a block of samples

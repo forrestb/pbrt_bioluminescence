@@ -36,6 +36,9 @@
 #include "scene.h"
 #include "paramset.h"
 #include "montecarlo.h"
+#include "photonmap.h"
+#include <iostream>
+#include <sstream>
 
 // SingleScatteringIntegrator Method Definitions
 void SingleScatteringIntegrator::RequestSamples(Sampler *sampler, Sample *sample,
@@ -75,6 +78,9 @@ Spectrum SingleScatteringIntegrator::Li(const Scene *scene, const Renderer *rend
     // Do single scattering volume integration in _vr_
     Spectrum Lv(0.);
 
+    
+    
+
     // Prepare for volume integration stepping
     int nSamples = Ceil2Int((t1-t0) / stepSize);
     float step = (t1 - t0) / nSamples;
@@ -91,11 +97,15 @@ Spectrum SingleScatteringIntegrator::Li(const Scene *scene, const Renderer *rend
     float *lightPos = arena.Alloc<float>(2*nSamples);
     LDShuffleScrambled2D(1, nSamples, lightPos, rng);
     uint32_t sampOffset = 0;
+    
+    
     for (int i = 0; i < nSamples; ++i, t0 += step) {
+        
         // Advance to sample at _t0_ and update _T_
         pPrev = p;
         p = ray(t0);
         Ray tauRay(pPrev, p - pPrev, 0.f, 1.f, ray.time, ray.depth);
+        
         Spectrum stepTau = vr->tau(tauRay,
                                    .5f * stepSize, rng.RandomFloat());
         Tr *= Exp(-stepTau);
@@ -109,6 +119,8 @@ Spectrum SingleScatteringIntegrator::Li(const Scene *scene, const Renderer *rend
             }
             Tr /= continueProb;
         }
+        
+        //Lv += Photons around point p
 
         // Compute single-scattering source term at _p_
         Lv += Tr * vr->Lve(p, w, ray.time);
