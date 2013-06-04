@@ -418,10 +418,10 @@ SurfaceIntegrator *MakeSurfaceIntegrator(const string &name,
 
 
 VolumeIntegrator *MakeVolumeIntegrator(const string &name,
-        const ParamSet &paramSet) {
+        const ParamSet &paramSet, SurfaceIntegrator *surfaceIntegrator) {
     VolumeIntegrator *vi = NULL;
     if (name == "single")
-        vi = CreateSingleScatteringIntegrator(paramSet);
+        vi = CreateSingleScatteringIntegrator(paramSet, surfaceIntegrator);
     else if (name == "emission")
         vi = CreateEmissionVolumeIntegrator(paramSet);
     else
@@ -1077,11 +1077,12 @@ Renderer *RenderOptions::MakeRenderer() const {
     // Create remaining _Renderer_ types
     else if (RendererName == "createprobes") {
         // Create surface and volume integrators
+        printf("A\n");
         SurfaceIntegrator *surfaceIntegrator = MakeSurfaceIntegrator(SurfIntegratorName,
             SurfIntegratorParams);
         if (!surfaceIntegrator) Severe("Unable to create surface integrator.");
         VolumeIntegrator *volumeIntegrator = MakeVolumeIntegrator(VolIntegratorName,
-            VolIntegratorParams);
+            VolIntegratorParams, NULL);
         if (!volumeIntegrator) Severe("Unable to create volume integrator.");
         renderer = CreateRadianceProbesRenderer(camera, surfaceIntegrator, volumeIntegrator, RendererParams);
         RendererParams.ReportUnused();
@@ -1110,9 +1111,11 @@ Renderer *RenderOptions::MakeRenderer() const {
         // Create surface and volume integrators
         SurfaceIntegrator *surfaceIntegrator = MakeSurfaceIntegrator(SurfIntegratorName,
             SurfIntegratorParams);
+        //PhotonIntegrator *volumePhotonIntegrator = (PhotonIntegrator*)surfaceIntegrator;
+
         if (!surfaceIntegrator) Severe("Unable to create surface integrator.");
         VolumeIntegrator *volumeIntegrator = MakeVolumeIntegrator(VolIntegratorName,
-            VolIntegratorParams);
+            VolIntegratorParams, surfaceIntegrator);
         if (!volumeIntegrator) Severe("Unable to create volume integrator.");
         renderer = new SamplerRenderer(sampler, camera, surfaceIntegrator,
                                        volumeIntegrator, visIds);

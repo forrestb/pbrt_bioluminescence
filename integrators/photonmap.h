@@ -44,9 +44,21 @@
 
 struct Photon;
 struct RadiancePhoton;
-struct ClosePhoton;
+//struct ClosePhoton;
 struct PhotonProcess;
 struct RadiancePhotonProcess;
+
+struct ClosePhoton {
+    // ClosePhoton Public Methods
+    ClosePhoton(const Photon *p = NULL, float md2 = INFINITY)
+        : photon(p), distanceSquared(md2) { }
+    bool operator<(const ClosePhoton &p2) const {
+        return distanceSquared == p2.distanceSquared ?
+            (photon < p2.photon) : (distanceSquared < p2.distanceSquared);
+    }
+    const Photon *photon;
+    float distanceSquared;
+};
 
 
 // PhotonIntegrator Declarations
@@ -62,7 +74,10 @@ public:
         RNG &rng, MemoryArena &arena) const;
     void RequestSamples(Sampler *sampler, Sample *sample, const Scene *scene);
     void Preprocess(const Scene *scene, const Camera *camera, const Renderer *renderer);
-private:
+
+    Spectrum EVolumePhoton(KdTree<Photon> *map, int count, int nLookup,
+                              ClosePhoton *lookupBuf, float dist, const Point &p);
+
     // PhotonIntegrator Private Methods
     friend class PhotonShootingTask;
 

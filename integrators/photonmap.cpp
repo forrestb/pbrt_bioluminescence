@@ -138,19 +138,6 @@ struct PhotonProcess {
 };
 
 
-struct ClosePhoton {
-    // ClosePhoton Public Methods
-    ClosePhoton(const Photon *p = NULL, float md2 = INFINITY)
-        : photon(p), distanceSquared(md2) { }
-    bool operator<(const ClosePhoton &p2) const {
-        return distanceSquared == p2.distanceSquared ?
-            (photon < p2.photon) : (distanceSquared < p2.distanceSquared);
-    }
-    const Photon *photon;
-    float distanceSquared;
-};
-
-
 PhotonProcess::PhotonProcess(uint32_t mp, ClosePhoton *buf) {
     photons = buf;
     nLookup = mp;
@@ -182,8 +169,7 @@ static Spectrum LPhoton(KdTree<Photon> *map, int nPaths, int nLookup,
     const Vector &w, float maxDistSquared);
 static Spectrum EPhoton(KdTree<Photon> *map, int count, int nLookup,
     ClosePhoton *lookupBuf, float maxDist2, const Point &p, const Normal &n);
-static Spectrum EVolumePhoton(KdTree<Photon> *map, int count, int nLookup,
-                              ClosePhoton *lookupBuf, float dist, const Point &p);
+
 
 // PhotonIntegrator Local Definitions
 inline bool unsuccessful(uint32_t needed, uint32_t found, uint32_t shot) {
@@ -266,13 +252,14 @@ Spectrum LPhoton(KdTree<Photon> *map, int nPaths, int nLookup,
     return L;
 }
 
-Spectrum EVolumePhoton(KdTree<Photon> *map, int count, int nLookup,
+Spectrum PhotonIntegrator::EVolumePhoton(KdTree<Photon> *map, int count, int nLookup,
                        ClosePhoton *lookupBuf, float dist, const Point &p)
 {
     if(!map) return 0.f;
     
     PhotonProcess proc(nLookup, lookupBuf);
     float md3 = dist * dist * dist;
+    md3 += 100.0f;
     
     map->Lookup(p, proc, md3);
     Assert(md3 > 0.f);
@@ -434,6 +421,8 @@ void PhotonIntegrator::Preprocess(const Scene *scene,
             delete radianceTasks[i];
         progRadiance.Done();
         radianceMap = new KdTree<RadiancePhoton>(radiancePhotons);
+
+        //ourNewMap = new KdTree<Photon>(volumePhotons);
     }
     delete directMap;
 }
@@ -449,7 +438,7 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
     BBox bound = testRegion->WorldBound();
     
     //Set shooting options
-    int numOfPhotonsPerCore = 100;
+    int numOfPhotonsPerCore = 50000;
     int maxDepthTracePerPhoton = 5;
     
     //Loop over all of the photons we want to shoot out.
@@ -570,9 +559,12 @@ void PhotonShootingTask::Run() {
     std::cout<<"NUMBER OF VOLUME PHOTONS: "<< localVolumePhotons.size()<<" YAY!"<<std::endl;
 //    
 //    MutexLock lock(mutex);
-//    for (uint32_t i = 0; i < localVolumePhotons.size(); ++i){
-//        volumePhotons.push_back(localVolumePhotons[i]);
-//    }
+
+    { MutexLock lock(mutex);
+        for (uint32_t i = 0; i < localVolumePhotons.size(); ++i){
+            volumePhotons.push_back(localVolumePhotons[i]);
+        }
+    }
 //    MutexLock unlock(mutex);
 
     while (true) {
@@ -766,9 +758,9 @@ void ComputeRadianceTask::Run() {
                          EPhoton(indirectMap, nIndirectPaths, nLookup, lookupBuf,
                                  maxDistSquared, rp.p, rp.n) +
                          EPhoton(causticMap, nCausticPaths, nLookup, lookupBuf,
-                                 maxDistSquared, rp.p, rp.n) +
-                         EPhoton(volumeMap, nVolumePaths, nLookup, lookupBuf,
-                                 maxDistSquared, rp.p, rp.n);
+                                 maxDistSquared, rp.p, rp.n) /*+
+                         EVolumePhoton(volumeMap, nVolumePaths, nLookup, lookupBuf,
+                                 maxDistSquared, rp.p)*/;
             rp.Lo += INV_PI * rho_r * E;
         }
         if (!rho_t.IsBlack()) {
@@ -778,9 +770,10 @@ void ComputeRadianceTask::Run() {
                          EPhoton(indirectMap, nIndirectPaths, nLookup, lookupBuf,
                                  maxDistSquared, rp.p, -rp.n) +
                          EPhoton(causticMap, nCausticPaths, nLookup, lookupBuf,
-                                 maxDistSquared, rp.p, -rp.n) +
-                         EPhoton(volumeMap, nVolumePaths, nLookup, lookupBuf,
-                                 maxDistSquared, rp.p, -rp.n);
+                                 maxDistSquared, rp.p, -rp.n) /*+
+                         EVolumePhoton(volumeMap, nVolumePaths, nLookup, lookupBuf,
+                                 maxDistSquared, rp.p)*/;
+
             rp.Lo += INV_PI * rho_t * E;
         }
     }

@@ -40,6 +40,7 @@
 #include "volume.h"
 #include "integrator.h"
 
+
 // SingleScatteringIntegrator Declarations
 class SingleScatteringIntegrator : public VolumeIntegrator {
 public:
@@ -55,6 +56,8 @@ public:
     
     Spectrum Li(const Scene *, const Renderer *, const RayDifferential &ray,
          const Sample *sample, RNG &rng, Spectrum *T, MemoryArena &arena) const;
+
+    SurfaceIntegrator *referenceVolumePhotonIntegrator;
     
 private:
     // SingleScatteringIntegrator Private Data
@@ -63,6 +66,6 @@ private:
 };
 
 
-SingleScatteringIntegrator *CreateSingleScatteringIntegrator(const ParamSet &params);
+SingleScatteringIntegrator *CreateSingleScatteringIntegrator(const ParamSet &params, SurfaceIntegrator *surfaceIntegrator);
 
 #endif // PBRT_INTEGRATORS_SINGLE_H

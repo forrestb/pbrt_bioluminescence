@@ -33,6 +33,7 @@
 // integrators/single.cpp*
 #include "stdafx.h"
 #include "integrators/single.h"
+#include "integrators/photonmap.h"
 #include "scene.h"
 #include "paramset.h"
 #include "montecarlo.h"
@@ -121,6 +122,16 @@ Spectrum SingleScatteringIntegrator::Li(const Scene *scene, const Renderer *rend
         }
         
         //Lv += Photons around point p
+        //Lv += 
+        PhotonIntegrator *volPhoton = (PhotonIntegrator *)referenceVolumePhotonIntegrator;
+        KdTree<Photon> *treeOfVolumes = volPhoton->volumeMap;
+
+        ClosePhoton *lookupBuf = new ClosePhoton[200];
+        Spectrum specReturned = volPhoton->EVolumePhoton(treeOfVolumes, 0, 100, lookupBuf, 40.0f, p);
+                                         //EVolumePhoton(KdTree<Photon> *map, int count, int nLookup, ClosePhoton *lookupBuf, float dist, const Point &p);
+        delete[] lookupBuf;
+
+        Lv += specReturned;
 
         // Compute single-scattering source term at _p_
         Lv += Tr * vr->Lve(p, w, ray.time);
@@ -151,9 +162,13 @@ Spectrum SingleScatteringIntegrator::Li(const Scene *scene, const Renderer *rend
 }
 
 
-SingleScatteringIntegrator *CreateSingleScatteringIntegrator(const ParamSet &params) {
+SingleScatteringIntegrator *CreateSingleScatteringIntegrator(const ParamSet &params, SurfaceIntegrator *surfaceIntegrator) {
     float stepSize  = params.FindOneFloat("stepsize", 1.f);
-    return new SingleScatteringIntegrator(stepSize);
+
+    SingleScatteringIntegrator *scatter = new SingleScatteringIntegrator(stepSize);
+    scatter->referenceVolumePhotonIntegrator = surfaceIntegrator;
+
+    return scatter;
 }
 
 
