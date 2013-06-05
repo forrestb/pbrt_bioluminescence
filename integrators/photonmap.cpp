@@ -270,7 +270,7 @@ Spectrum PhotonIntegrator::EVolumePhoton(KdTree<Photon> *map, int count, int nLo
     for(int i =0; i < proc.nFound; i++)
         E += photons[i].photon->alpha * photons[i].photon->weight;
     
-    return E / (2.0*(4.0f/3.0f)* M_PI * md3);
+    return E / (20.0*(4.0f/3.0f)* M_PI * md3);
 }
 
 
