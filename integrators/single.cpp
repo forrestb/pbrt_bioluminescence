@@ -126,8 +126,8 @@ Spectrum SingleScatteringIntegrator::Li(const Scene *scene, const Renderer *rend
         PhotonIntegrator *volPhoton = (PhotonIntegrator *)referenceVolumePhotonIntegrator;
         KdTree<Photon> *treeOfVolumes = volPhoton->volumeMap;
 
-        ClosePhoton *lookupBuf = new ClosePhoton[200];
-        Spectrum specReturned = volPhoton->EVolumePhoton(treeOfVolumes, 0, 100, lookupBuf, 40.0f, p);
+        ClosePhoton *lookupBuf = new ClosePhoton[600];
+        Spectrum specReturned = volPhoton->EVolumePhoton(treeOfVolumes, 0, 600, lookupBuf, 0.15f, p);
                                          //EVolumePhoton(KdTree<Photon> *map, int count, int nLookup, ClosePhoton *lookupBuf, float dist, const Point &p);
         delete[] lookupBuf;
 

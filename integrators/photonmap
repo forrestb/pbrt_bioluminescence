@@ -270,7 +270,7 @@ Spectrum PhotonIntegrator::EVolumePhoton(KdTree<Photon> *map, int count, int nLo
     for(int i =0; i < proc.nFound; i++)
         E += photons[i].photon->alpha * photons[i].photon->weight;
     
-    return E / (2.0*(4.0f/3.0f)* M_PI * md3);
+    return E / ((4.0f/3.0f)* M_PI * md3);
 }
 
 
@@ -433,22 +433,20 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
     Point lightPosition = Point(0.0, 10.0, 2.0);
 
     //Get bounding box of volume region
-    DensityRegion *testRegion = (DensityRegion *)getRenderOptions()->volumeRegions.back();
+    VolumeRegion *testRegion = getRenderOptions()->volumeRegions.back();
     BBox bound = testRegion->WorldBound();
     
     //Set shooting options
-    int numOfPhotonsPerCore = 200000;
-    int maxDepthTracePerPhoton = 15;
+    int numOfPhotonsPerCore = 1000000;
+    int maxDepthTracePerPhoton = 5;
     
     //Loop over all of the photons we want to shoot out.
     for (int i = 0; i < numOfPhotonsPerCore; i++){
         
-        //Generate random x,y,z values      
+        //Generate random x,y,z values
         float xRandomVal = ((float)rand()/(float)RAND_MAX) * (testRegion->WorldBound().pMax.x-testRegion->WorldBound().pMin.x);
         float yRandomVal = ((float)rand()/(float)RAND_MAX) * (testRegion->WorldBound().pMax.y-testRegion->WorldBound().pMin.y);
         float zRandomVal = ((float)rand()/(float)RAND_MAX) * (testRegion->WorldBound().pMax.z-testRegion->WorldBound().pMin.z);
-        
-        //Allocate the random point
         Point randomSamplePointInBox = Point(testRegion->WorldBound().pMin.x+xRandomVal, testRegion->WorldBound().pMin.y+yRandomVal, testRegion->WorldBound().pMin.z+zRandomVal);
 
         //Construct Photon
@@ -460,7 +458,7 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
         float hitt0 = NULL;
         float hitt1 = NULL;
         if (bound.IntersectP(Ray(photon.p, photon.wi, 0.0f), &hitt0, &hitt1)){
-          //  printf("Good, we hit. That's to be expected since we picked a point inside the box \n");
+            printf("Good, we hit. That's to be expected since we picked a point inside the box \n");
         } else continue; //There was no intersection with the box
 
         float tToUse = hitt0;
@@ -473,53 +471,25 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
         //Photon starts at surface of bounding box
         float currentDepthInMedium = 0;
 
+        //Trace photon through volume
         for (int j = 0; j < maxDepthTracePerPhoton; j++){
-            
-            
-            float density = testRegion->Density(photon.p);
-  
+        
             //Calculate distance until next interaction
+            Spectrum sigma_t = testRegion->sigma_t(photon.p, photon.wi, tToUse); //Extinction coefficient
             Spectrum sigma_a = testRegion->sigma_a(photon.p, photon.wi, tToUse); //Absorption coefficient
             Spectrum sigma_s = testRegion->sigma_s(photon.p, photon.wi, tToUse); //Scattering coefficient
-            Spectrum sigma_t = testRegion->sigma_t(photon.p, photon.wi, tToUse); //Extinction coefficient
-            Spectrum trueSigma_A = testRegion->trueSigma_A();
-            Spectrum trueSigma_S = testRegion->trueSigma_S();
-            Spectrum trueSigma_T = testRegion->trueSigma_T();
+            float rgb_T[3];
             float rgb_A[3];
             float rgb_S[3];
-            float rgb_T[3];
-            float true_A[3];
-            float true_S[3];
-            float true_T[3];
-            
-            //Modulated spectrums
-            sigma_a.ToRGB(rgb_A);
-            sigma_s.ToRGB(rgb_S);
             sigma_t.ToRGB(rgb_T);
-            
-            //Original spectrums
-            trueSigma_A.ToRGB(true_A);
-            trueSigma_S.ToRGB(true_S);
-            trueSigma_T.ToRGB(true_T);
-            
-            //Average values with density
+            float avgSigma_t = (rgb_T[0]+rgb_T[1]+rgb_T[2])/3.0f;
             float avgSigma_a = (rgb_A[0]+rgb_A[1]+rgb_A[2])/3.0f;
             float avgSigma_s = (rgb_S[0]+rgb_S[1]+rgb_S[2])/3.0f;
-            float avgSigma_t = (rgb_T[0]+rgb_T[1]+rgb_T[2])/3.0f;
+            float averageDistanceUntilEvent = -log(((float)rand()/(float)RAND_MAX)) / avgSigma_t;
             
-            //Average true values without density
-            float avgTrue_A = (true_A[0]+true_A[1]+true_A[2])/3.0f;
-            float avgTrue_S = (true_S[0]+true_S[1]+true_S[2])/3.0f;
-            float avgTrue_T = (true_T[0]+true_T[1]+true_T[2])/3.0f;
-            
-
-            float averageDistanceUntilEvent = -log(((float)rand()/(float)RAND_MAX)) / avgTrue_T;
-            
-            //Calculate Probability
-            float probOfScattering = avgTrue_S/(avgTrue_T);
-            
-            
-           // std::cout<<"PROBABILITY: "<<probOfScattering<<std::endl;
+            //Calculate Probabilities
+            float probOfAbsorbing =  avgSigma_a/avgSigma_t;
+            float probOfScattering = avgSigma_s/avgSigma_t;
             
             //Update Photon position and current depth overall
             photon.p = photon.p + photon.wi*averageDistanceUntilEvent;
@@ -528,17 +498,20 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
             //Determine if photon should be scattered or absorbed
             float randomlyChoosenNormalizedNumber = (float)rand()/(float)RAND_MAX;
             
-            
-            float rgb_alpha[3];
-            alpha.ToRGB(rgb_alpha);
-            float e = 2.71828;
-            rgb_alpha[0] *= powf(e, -true_T[0] * currentDepthInMedium) * density;
-            rgb_alpha[1] *= powf(e, -true_T[1] * currentDepthInMedium) * density;
-            rgb_alpha[2] *= powf(e, -true_T[2] * currentDepthInMedium) * density;
-            photon.alpha = Spectrum::FromRGB(rgb_alpha);
-  
-            if (randomlyChoosenNormalizedNumber > probOfScattering){ 
+            if (randomlyChoosenNormalizedNumber > probOfAbsorbing){ //Absorb The Photon!
                 
+                float e = 2.71828;
+                
+                //Attenuate the light for each color channel
+                float rgb_alpha[3];
+                alpha.ToRGB(rgb_alpha);
+                rgb_alpha[0] *= powf(e, rgb_T[0] * currentDepthInMedium);
+                rgb_alpha[1] *= powf(e, rgb_T[1] * currentDepthInMedium);
+                rgb_alpha[2] *= powf(e, rgb_T[2] * currentDepthInMedium);
+                photon.alpha = Spectrum::FromRGB(rgb_alpha);
+                
+                std::cout<<"COLOR: "<<rgb_alpha[0]<<" "<<rgb_alpha[1]<<" "<<rgb_alpha[2]<<std::endl;
+
                 //Store photon
                 localVolumePhotons.push_back(photon);
                 break; //This photon is done with so we can stop the loop
@@ -557,12 +530,10 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
                 
                 //Use the phase function to determine probability of new direction
                 Vector newD(x,y,z);
-                float g = 0.05; //Just a random value for now
-                float phaseFunctionValue = PhaseSchlick(photon.wi, newD, g);
-               // std::cout<<"PHASE VALUE: "<<phaseFunctionValue<<std::endl;
+                float g = 0.4; //Just a random value for now
+                float phaseFunctionValue = PhaseHG(photon.wi, newD, g);
                 photon.weight *= phaseFunctionValue;
                 photon.wi = newD;
-                localVolumePhotons.push_back(photon);
             } 
         }
     }

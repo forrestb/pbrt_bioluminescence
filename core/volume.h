@@ -78,6 +78,19 @@ public:
         : sig_a(sa), sig_s(ss), le(emit), g(gg),
           WorldToVolume(Inverse(VolumeToWorld)) { }
     virtual float Density(const Point &Pobj) const = 0;
+    
+    Spectrum trueSigma_A(){
+        return sig_a;
+    }
+    
+    Spectrum trueSigma_S(){
+        return sig_s;
+    }
+    
+    Spectrum trueSigma_T(){
+        return sig_a + sig_s;
+    }
+    
     Spectrum sigma_a(const Point &p, const Vector &, float) const {
         return Density(WorldToVolume(p)) * sig_a;
     }
