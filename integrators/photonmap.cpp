@@ -270,7 +270,8 @@ Spectrum PhotonIntegrator::EVolumePhoton(KdTree<Photon> *map, int count, int nLo
     for(int i =0; i < proc.nFound; i++)
         E += photons[i].photon->alpha * photons[i].photon->weight;
     
-    return E / (60.0*(4.0f/3.0f)* M_PI * md3);
+    float division = 2.0;
+    return (E * ((float)proc.nFound/(float)nLookup)/ (division*(4.0f/3.0f)* M_PI * md3));
 }
 
 
@@ -437,8 +438,8 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
     BBox bound = testRegion->WorldBound();
     
     //Set shooting options
-    int numOfPhotonsPerCore = 200000;
-    int maxDepthTracePerPhoton = 15;
+    int numOfPhotonsPerCore =  215000;//0;//250000;
+    int maxDepthTracePerPhoton = 4;
     
     //Loop over all of the photons we want to shoot out.
     for (int i = 0; i < numOfPhotonsPerCore; i++){
@@ -452,7 +453,7 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
         Point randomSamplePointInBox = Point(testRegion->WorldBound().pMin.x+xRandomVal, testRegion->WorldBound().pMin.y+yRandomVal, testRegion->WorldBound().pMin.z+zRandomVal);
 
         //Construct Photon
-        float rgb[] = {1,1,1};
+        float rgb[] = {0.2,0.2,1};
         Spectrum alpha = Spectrum::FromRGB(rgb);
         Photon photon(lightPosition, alpha, Vector(randomSamplePointInBox-lightPosition));
 
@@ -472,6 +473,7 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
         
         //Photon starts at surface of bounding box
         float currentDepthInMedium = 0;
+        int bounceDepth = 0;
 
         for (int j = 0; j < maxDepthTracePerPhoton; j++){
             
@@ -512,7 +514,6 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
             float avgTrue_S = (true_S[0]+true_S[1]+true_S[2])/3.0f;
             float avgTrue_T = (true_T[0]+true_T[1]+true_T[2])/3.0f;
             
-
             float averageDistanceUntilEvent = -log(((float)rand()/(float)RAND_MAX)) / avgTrue_T;
             
             //Calculate Probability
@@ -540,6 +541,7 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
             if (randomlyChoosenNormalizedNumber > probOfScattering){ 
                 
                 //Store photon
+        //        if(bounceDepth > 1)
                 localVolumePhotons.push_back(photon);
                 break; //This photon is done with so we can stop the loop
             }
@@ -562,8 +564,10 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
                // std::cout<<"PHASE VALUE: "<<phaseFunctionValue<<std::endl;
                 photon.weight *= phaseFunctionValue;
                 photon.wi = newD;
+              //  if(bounceDepth > 1)
                 localVolumePhotons.push_back(photon);
-            } 
+            }
+            bounceDepth++;
         }
     }
 }
@@ -788,9 +792,7 @@ void ComputeRadianceTask::Run() {
                          EPhoton(indirectMap, nIndirectPaths, nLookup, lookupBuf,
                                  maxDistSquared, rp.p, rp.n) +
                          EPhoton(causticMap, nCausticPaths, nLookup, lookupBuf,
-                                 maxDistSquared, rp.p, rp.n) /*+
-                         EVolumePhoton(volumeMap, nVolumePaths, nLookup, lookupBuf,
-                                 maxDistSquared, rp.p)*/;
+                                 maxDistSquared, rp.p, rp.n);
             rp.Lo += INV_PI * rho_r * E;
         }
         if (!rho_t.IsBlack()) {
@@ -800,9 +802,7 @@ void ComputeRadianceTask::Run() {
                          EPhoton(indirectMap, nIndirectPaths, nLookup, lookupBuf,
                                  maxDistSquared, rp.p, -rp.n) +
                          EPhoton(causticMap, nCausticPaths, nLookup, lookupBuf,
-                                 maxDistSquared, rp.p, -rp.n) /*+
-                         EVolumePhoton(volumeMap, nVolumePaths, nLookup, lookupBuf,
-                                 maxDistSquared, rp.p)*/;
+                                 maxDistSquared, rp.p, -rp.n);
 
             rp.Lo += INV_PI * rho_t * E;
         }
