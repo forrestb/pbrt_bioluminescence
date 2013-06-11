@@ -438,7 +438,7 @@ void PhotonShootingTask::ShootVolumetricPhotons(vector<Photon> &localVolumePhoto
     BBox bound = testRegion->WorldBound();
     
     //Set shooting options
-    int numOfPhotonsPerCore =  215000;//0;//250000;
+    int numOfPhotonsPerCore =  215000;////215000;//0;//250000;
     int maxDepthTracePerPhoton = 4;
     
     //Loop over all of the photons we want to shoot out.

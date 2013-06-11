@@ -82,6 +82,8 @@ public:
     BBox WorldBound() const;
     bool Intersect(const Ray &ray, float *tHit, float *rayEpsilon,
                    DifferentialGeometry *dg) const;
+    bool IntersectBackwards(const Ray &ray, float *tHit, float *rayEpsilon,
+                   DifferentialGeometry *dg) const;
     bool IntersectP(const Ray &ray) const;
     void GetUVs(float uv[3][2]) const {
         if (mesh->uvs) {
@@ -103,6 +105,9 @@ public:
             const DifferentialGeometry &dg,
             DifferentialGeometry *dgShading) const;
     Point Sample(float u1, float u2, Normal *Ns) const;
+    Point GetPointOne();
+    Point GetPointTwo();
+    Point GetPointThree();
 private:
     // Triangle Private Data
     Reference<TriangleMesh> mesh;

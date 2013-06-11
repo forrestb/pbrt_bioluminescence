@@ -136,6 +136,7 @@ static vector<GraphicsState> pushedGraphicsStates;
 static vector<TransformSet> pushedTransforms;
 static vector<uint32_t> pushedActiveTransformBits;
 static TransformCache transformCache;
+static TriangleMesh *fishTriangleMesh;
 
 // API Macros
 #define VERIFY_INITIALIZED(func) \
@@ -192,9 +193,11 @@ Reference<Shape> MakeShape(const string &name,
     else if (name == "hyperboloid")
         s = CreateHyperboloidShape(object2world, world2object, reverseOrientation,
                                    paramSet);
-    else if (name == "trianglemesh")
+    else if (name == "trianglemesh"){
         s = CreateTriangleMeshShape(object2world, world2object, reverseOrientation,
                                     paramSet, &graphicsState.floatTextures);
+        fishTriangleMesh = (TriangleMesh *)s;
+    }
     else if (name == "heightfield")
         s = CreateHeightfieldShape(object2world, world2object, reverseOrientation,
                                    paramSet);
@@ -421,7 +424,7 @@ VolumeIntegrator *MakeVolumeIntegrator(const string &name,
         const ParamSet &paramSet, SurfaceIntegrator *surfaceIntegrator) {
     VolumeIntegrator *vi = NULL;
     if (name == "single")
-        vi = CreateSingleScatteringIntegrator(paramSet, surfaceIntegrator);
+        vi = CreateSingleScatteringIntegrator(paramSet, surfaceIntegrator, fishTriangleMesh);
     else if (name == "emission")
         vi = CreateEmissionVolumeIntegrator(paramSet);
     else

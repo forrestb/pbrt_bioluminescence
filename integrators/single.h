@@ -39,6 +39,7 @@
 // integrators/single.h*
 #include "volume.h"
 #include "integrator.h"
+#include "shapes/trianglemesh.h"
 
 
 // SingleScatteringIntegrator Declarations
@@ -58,6 +59,8 @@ public:
          const Sample *sample, RNG &rng, Spectrum *T, MemoryArena &arena) const;
 
     SurfaceIntegrator *referenceVolumePhotonIntegrator;
+    TriangleMesh *fishReferenceMesh;
+    vector<Reference<Shape> > arrayOfFishTriangles;
     
 private:
     // SingleScatteringIntegrator Private Data
@@ -66,6 +69,6 @@ private:
 };
 
 
-SingleScatteringIntegrator *CreateSingleScatteringIntegrator(const ParamSet &params, SurfaceIntegrator *surfaceIntegrator);
-
+SingleScatteringIntegrator *CreateSingleScatteringIntegrator(const ParamSet &params, SurfaceIntegrator *surfaceIntegrator, TriangleMesh *fishMesh);
+ 
 #endif // PBRT_INTEGRATORS_SINGLE_H

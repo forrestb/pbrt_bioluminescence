@@ -108,11 +108,26 @@ Spectrum SingleScatteringIntegrator::Li(const Scene *scene, const Renderer *rend
         // Advance to sample at _t0_ and update _T_
         pPrev = p;
         p = ray(t0);
-        Ray tauRay(pPrev, p - pPrev, 0.f, 1.f, ray.time, ray.depth);
-        
-        Spectrum stepTau = vr->tau(tauRay,
-                                   .5f * stepSize, rng.RandomFloat());
-        Tr *= Exp(-stepTau);
+
+
+
+        int totalTrianglesHit = 0;
+        DensityRegion *testRegion = (DensityRegion *)getRenderOptions()->volumeRegions.back();
+        BBox bound = testRegion->WorldBound();
+
+        /*for (int i = 0; i < arrayOfFishTriangles.size(); i++){
+            Triangle *tri = (Triangle*) arrayOfFishTriangles[i].GetPtr();
+
+            float tHitAt = 0.0;
+            float epsilon = 0.0f;
+            DifferentialGeometry dg;
+            Ray myRay(p, p-pPrev, 0.0f);
+
+            if (tri->Intersect(myRay, &tHitAt, &epsilon, &dg) || tri->IntersectBackwards(myRay, &tHitAt, &epsilon, &dg) ) {
+                totalTrianglesHit++;
+                break;
+            }
+        }*/
 
         // Possibly terminate ray marching if transmittance is small
         if (Tr.y() < 1e-3) {
@@ -124,42 +139,62 @@ Spectrum SingleScatteringIntegrator::Li(const Scene *scene, const Renderer *rend
             Tr /= continueProb;
         }
         
-        //Lv += Photons around point p
-        //Lv += 
-        PhotonIntegrator *volPhoton = (PhotonIntegrator *)referenceVolumePhotonIntegrator;
-        KdTree<Photon> *treeOfVolumes = volPhoton->volumeMap;
+        //if (totalTrianglesHit > 0){
 
-        ClosePhoton *lookupBuf = new ClosePhoton[700];
-        Spectrum specReturned = volPhoton->EVolumePhoton(treeOfVolumes, 0, 700, lookupBuf, 0.15f, p);
-                                         //EVolumePhoton(KdTree<Photon> *map, int count, int nLookup, ClosePhoton *lookupBuf, float dist, const Point &p);
-        delete[] lookupBuf;
+            Ray tauRay(pPrev, p - pPrev, 0.f, 1.f, ray.time, ray.depth); //For some reason these 3 lines do the smoke 
+            Spectrum stepTau = vr->tau(tauRay, .5f * stepSize, rng.RandomFloat());
+            Tr *= Exp(-stepTau);
 
+            PhotonIntegrator *volPhoton = (PhotonIntegrator *)referenceVolumePhotonIntegrator;
+            KdTree<Photon> *treeOfVolumes = volPhoton->volumeMap;
+            ClosePhoton *lookupBuf = new ClosePhoton[700];
+            Spectrum specReturned = volPhoton->EVolumePhoton(treeOfVolumes, 0, 700, lookupBuf, 0.15f, p);
+                                             //EVolumePhoton(KdTree<Photon> *map, int count, int nLookup, ClosePhoton *lookupBuf, float dist, const Point &p);
+            delete[] lookupBuf;
+            Lv += specReturned;
+
+            //float vals[] = {100000,100000,100000};
+            //Spectrum test = Spectrum::FromRGB(vals);
+            //Lv += test;
+
+            // Compute single-scattering source term at _p_
+            Lv += Tr * vr->Lve(p, w, ray.time);
         
-        
-        Lv += specReturned;
-
-        // Compute single-scattering source term at _p_
-        Lv += Tr * vr->Lve(p, w, ray.time);
-        Spectrum ss = vr->sigma_s(p, w, ray.time);
-        if (!ss.IsBlack() && scene->lights.size() > 0) {
-            int nLights = scene->lights.size();
-            int ln = min(Floor2Int(lightNum[sampOffset] * nLights),
-                         nLights-1);
-            Light *light = scene->lights[ln];
-            // Add contribution of _light_ due to scattering at _p_
-            float pdf;
-            VisibilityTester vis;
-            Vector wo;
-            LightSample ls(lightComp[sampOffset], lightPos[2*sampOffset],
-                           lightPos[2*sampOffset+1]);
-            Spectrum L = light->Sample_L(p, 0.f, ls, ray.time, &wo, &pdf, &vis);
-            
-            if (!L.IsBlack() && pdf > 0.f && vis.Unoccluded(scene)) {
-                Spectrum Ld = L * vis.Transmittance(scene, renderer, NULL, rng, arena);
-                Lv += Tr * ss * vr->p(p, w, -wo, ray.time) * Ld * float(nLights) /
-                        pdf;
-            }
+        /*else if (totalTrianglesHit > 0){
+            float vals[] = {0,100000,0};
+            Spectrum test = Spectrum::FromRGB(vals);
+            Lv += test;
         }
+        else{
+            float vals[] = {100000,0,0};
+            Spectrum test = Spectrum::FromRGB(vals);
+            Lv += test;
+        }*/
+            /*float vals[] = {0,100000,0};
+            Spectrum test = Spectrum::FromRGB(vals);
+            Lv += test;*/
+
+            Spectrum ss = vr->sigma_s(p, w, ray.time);
+            if (!ss.IsBlack() && scene->lights.size() > 0) {
+                int nLights = scene->lights.size();
+                int ln = min(Floor2Int(lightNum[sampOffset] * nLights),
+                             nLights-1);
+                Light *light = scene->lights[ln];
+                // Add contribution of _light_ due to scattering at _p_
+                float pdf;
+                VisibilityTester vis;
+                Vector wo;
+                LightSample ls(lightComp[sampOffset], lightPos[2*sampOffset],
+                               lightPos[2*sampOffset+1]);
+                Spectrum L = light->Sample_L(p, 0.f, ls, ray.time, &wo, &pdf, &vis);
+                
+                if (!L.IsBlack() && pdf > 0.f && vis.Unoccluded(scene)) {
+                    Spectrum Ld = L * vis.Transmittance(scene, renderer, NULL, rng, arena);
+                    Lv += Tr * ss * vr->p(p, w, -wo, ray.time) * Ld * float(nLights) /
+                            pdf;
+                }
+            }
+        //}
         ++sampOffset;
     }
     *T = Tr;
@@ -173,13 +208,24 @@ Spectrum SingleScatteringIntegrator::Li(const Scene *scene, const Renderer *rend
 }
 
 
-SingleScatteringIntegrator *CreateSingleScatteringIntegrator(const ParamSet &params, SurfaceIntegrator *surfaceIntegrator) {
+SingleScatteringIntegrator *CreateSingleScatteringIntegrator(const ParamSet &params, SurfaceIntegrator *surfaceIntegrator, TriangleMesh *fishMesh) {
     float stepSize  = params.FindOneFloat("stepsize", 1.f);
 
     SingleScatteringIntegrator *scatter = new SingleScatteringIntegrator(stepSize);
     scatter->referenceVolumePhotonIntegrator = surfaceIntegrator;
+    scatter->fishReferenceMesh = fishMesh;
+
+    //void TriangleMesh::Refine(vector<Reference<Shape> > &refined) const {
+
+    //arrayOfFishTriangles;// = vector<Reference<Shape> >;
+
+    fishMesh->Refine(scatter->arrayOfFishTriangles);
+
+    /*for (int i = 0; i < arrayOfFishTriangles.size(); i++){
+        printf("Another Triangle!\n");
+    }
+    printf("Total Num Of Triangles: %d\n", arrayOfFishTriangles.size());*/
 
     return scatter;
 }
-
 
